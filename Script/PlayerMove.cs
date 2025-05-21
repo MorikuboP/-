@@ -1,93 +1,92 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMove : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 5f; // 移動スピード倍率
-    [SerializeField] private Rigidbody rb;
-    [SerializeField] private float minLimitX, maxLimitX, minLimitZ, maxLimitZ;
+    [SerializeField] private float moveSpeed = 4f;
+    private bool _isMove = false;
+    private Animator anime;
+    private Rigidbody _rigidbody;
+    private Vector3 Velocity;
+    #region property
+    public bool IsMove
+    {
+        get { return _isMove; }
+        set { _isMove = value; }
+    }
 
-    private Animator animator; // Animator コンポーネント
-    private Vector3 moveDirection;
+    public Vector3 PlayerSpeed
+    {
+        get { return Velocity; }
+        set { Velocity = value; }
+    }
+    #endregion
+
+    public static class Tags
+    {
+        public const string Run = "Run";
+        public const string Hori = "Horizontal";
+        public const string Ver = "Vertical";
+    }
+    private void Awake()
+    {
+        _rigidbody = GetComponent<Rigidbody>();
+    }
+
+
 
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        animator = GetComponent<Animator>(); // Animator の取得
+        anime = GetComponent<Animator>();
+        _rigidbody = GetComponent<Rigidbody>();
+
+        // Rigidbody の初期設定
+        _rigidbody.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
     }
 
-    private void Update()
+
+    /// <summary>
+    /// プレイヤーの移動挙動
+    /// </summary>
+    void FixedUpdate()
     {
-        HandleInput(); // 入力処理
-        UpdateRotation(); // カメラに向き続ける
-        UpdateAnimation(); // アニメーション制御
-    }
-
-    private void FixedUpdate()
-    {
-        Move(); // Rigidbody による移動
-    }
-
-    private void HandleInput()
-    {
-        // カメラの前方向と右方向を取得
-        Vector3 cameraForward = Vector3.Scale(Camera.main.transform.forward, new Vector3(1, 0, 1)).normalized;
-        Vector3 cameraRight = Vector3.Scale(Camera.main.transform.right, new Vector3(1, 0, 1)).normalized;
-
-        // 入力に基づいて移動方向を計算
-        moveDirection = Vector3.zero;
-
-        if (Input.GetKey(KeyCode.W)) moveDirection += cameraForward;
-        if (Input.GetKey(KeyCode.A)) moveDirection -= cameraRight;
-        if (Input.GetKey(KeyCode.S)) moveDirection -= cameraForward;
-        if (Input.GetKey(KeyCode.D)) moveDirection += cameraRight;
-
-        moveDirection = moveDirection.normalized * moveSpeed; // スピード倍率を適用
-    }
-
-    private void UpdateRotation()
-    {
-        // プレイヤーの向きをカメラの向きに合わせる
-        Vector3 cameraForward = Vector3.Scale(Camera.main.transform.forward, new Vector3(1, 0, 1)).normalized;
-        if (cameraForward.magnitude > 0)
+        if (_isMove)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(cameraForward, Vector3.up);
-            transform.rotation = targetRotation; // カメラ方向を向き続ける
-        }
-    }
+            float moveX = Input.GetAxis(Tags.Hori);
+            float moveZ = Input.GetAxis(Tags.Ver);
 
-    private void Move()
-    {
-        if (moveDirection.magnitude > 0)
-        {
-            rb.velocity = moveDirection; // 移動処理
+            Vector3 movement = new Vector3(-moveZ, 0, moveX);
+
+            if (movement.magnitude > 0.3f)
+            {
+                anime.SetBool(Tags.Run, true);
+            }
+            else
+            {
+                anime.SetBool(Tags.Run, false);
+            }
+
+            if (movement.magnitude > 1)
+            {
+                movement.Normalize();
+            }
+
+            // Rigidbody の velocity を使って移動
+            _rigidbody.velocity = new Vector3(movement.x * moveSpeed, _rigidbody.velocity.y, movement.z * moveSpeed);
+
+            // 移動ベクトルがゼロでない場合のみ回転させる
+            if (movement != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(movement);
+                _rigidbody.MoveRotation(Quaternion.Slerp(_rigidbody.rotation, targetRotation, Time.fixedDeltaTime * 10f));
+            }
         }
         else
         {
-            rb.velocity = Vector3.zero; // 停止時の速度をゼロに設定
-        }
-
-        // 移動範囲を制限
-        rb.position = new Vector3(
-            Mathf.Clamp(rb.position.x, minLimitX, maxLimitX),
-            rb.position.y,
-            Mathf.Clamp(rb.position.z, minLimitZ, maxLimitZ)
-        );
-    }
-
-    private void UpdateAnimation()
-    {
-        // 移動中かどうかを判定してアニメーションを制御
-        SetWalkAnimation(moveDirection.magnitude > 0.1f);
-    }
-
-    private void SetWalkAnimation(bool isWalking)
-    {
-        if (animator != null)
-        {
-            animator.SetBool("Walk", isWalking);
+            // 移動していないときは停止
+            _rigidbody.velocity = new Vector3(0, _rigidbody.velocity.y, 0);
+            anime.SetBool(Tags.Run, false);
         }
     }
+
 }
-

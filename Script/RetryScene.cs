@@ -1,12 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
-public class StartScene : MonoBehaviour
+public class RetryScene : MonoBehaviour
 {
- public void SwitchScene()
+    public void SwitchScene()
     {
         SceneManager.LoadScene("GameScene", LoadSceneMode.Single);
     }
-
-  
 }
